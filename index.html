@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>LearnersLeague</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  /* ===========================
+     Theme + Layout
+     Single-file CSS. Adjust variables below.
+     =========================== */
+  :root{
+    --bg:#071229;
+    --panel: rgba(10,18,34,0.75);
+    --muted:#9fb0c9;
+    --text:#e6eef8;
+    --accent1:#38bdf8;
+    --accent2:#818cf8;
+    --accent3:#34d399;
+    --good:#34d399;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --card-radius:16px;
+    --shadow: 0 14px 40px rgba(2,8,23,.6);
+    /* NEW: RGB versions for glow effects */
+    --accent1-rgb: 56, 189, 248;
+    --good-rgb: 52, 211, 153;
+    --bad-rgb: 239, 68, 68;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    background:
+      radial-gradient(900px 600px at 50% -200px, rgba(20,30,50,.75) 0%, rgba(5,9,16,1) 60%),
+      linear-gradient(180deg,#041021 0%, #071229 100%);
+    color:var(--text);
+    overflow:hidden;
+    /* UPDATED: Slower, more subtle background animation */
+    animation: bg-pan 40s linear infinite;
+  }
+
+  /* Floating corners (webcam, timer) */
+  .corner{
+    position:fixed; 
+    z-index:50; 
+    padding:16px;
+    /* Staggered load-in animation */
+    opacity: 0;
+    transform: scale(0.95);
+    animation: load-in 0.6s ease-out forwards;
+  }
+  .top-left{top:0; left:0; animation-delay: 0.2s;}
+  .top-right{top:0; right:0; animation-delay: 0.3s;}
+  .bottom-left{left:0; bottom:0; animation-delay: 0.4s;}
+  /* This is the quote section, already centered */
+  .bottom-center{
+    position:fixed; 
+    left:50%; 
+    bottom:18px; 
+    transform:translateX(-50%); 
+    width:min(900px,92vw);
+    opacity: 0;
+    transform: scale(0.95);
+    animation: load-in 0.6s ease-out forwards;
+    animation-delay: 0.5s;
+  }
+
+  /* Webcam card */
+  .cam{
+    width:240px;
+    background:var(--panel);
+    border-radius:var(--card-radius);
+    box-shadow:var(--shadow);
+    border:1px solid rgba(255,255,255,.06);
+    overflow:hidden;
+    backdrop-filter: blur(10px);
+    /* UPDATED: Smoother transition */
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  /* UPDATED: Enhanced hover glow */
+  .cam:hover {
+    transform: scale(1.03) translateY(-4px);
+    box-shadow: 0 12px 35px rgba(2,8,23,.8), 0 0 20px rgba(var(--accent1-rgb), 0.2);
+    border-color: rgba(var(--accent1-rgb), 0.3);
+  }
+  .cam header{display:flex;align-items:center;gap:8px;padding:8px 12px;color:var(--muted);font-size:12px;text-transform:uppercase}
+  /* NEW: Dot animation */
+  .cam .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 8px rgba(239,68,68,.9); transition: all 0.4s ease;}
+  video{display:block; width:100%; height:160px; object-fit:cover; background:#000}
+  .cam .status{padding:8px 12px;color:var(--muted);font-size:13px}
+
+  /* Timer (top-right) */
+  .timer{
+    background:var(--panel);
+    border-radius:18px;
+    padding:14px 18px;
+    display:flex; align-items:center; gap:18px;
+    min-width:240px; justify-content:space-between;
+    box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.06);
+    backdrop-filter: blur(10px);
+    /* UPDATED: Smoother transition */
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  /* UPDATED: Enhanced hover glow */
+  .timer:hover {
+    transform: scale(1.03) translateY(-4px);
+    box-shadow: 0 12px 35px rgba(2,8,23,.8), 0 0 20px rgba(var(--accent1-rgb), 0.2);
+    border-color: rgba(var(--accent1-rgb), 0.3);
+  }
+  .time{
+    font-variant-numeric:tabular-nums;
+    font-weight:800; font-size:clamp(24px, 4vw, 44px);
+    letter-spacing:.02em;
+  }
+  .mini-bar{width:120px;height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;border:1px solid rgba(255,255,255,.03)}
+  .mini-bar > span{display:block;height:100%;width:0%; background:linear-gradient(90deg,var(--accent1),var(--accent2)); transition:width .5s linear}
+
+  /* Status text under timer */
+  .ai-status {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.03);
+    color: var(--muted);
+    min-width: 90px;
+    text-align:center;
+    text-transform:uppercase;
+    letter-spacing: .06em;
+    transition: all 0.4s ease;
+  }
+  /* UPDATED: Pulsing glow for status */
+  .ai-status.focusing { color: #34d399; animation: pulse-glow 2.5s infinite alternate; --glow-color: var(--good-rgb); border:1px solid rgba(52,211,153,.08) }
+  .ai-status.away    { color: #ef4444; animation: pulse-glow 2.5s infinite alternate; --glow-color: var(--bad-rgb); border:1px solid rgba(239,68,68,.08) }
+
+  /* Center: compact circular structure */
+  .center{
+    position:absolute; inset:0; display:grid; place-items:center; 
+    padding:80px 16px 180px;
+    opacity: 0;
+    transform: scale(0.95);
+    animation: load-in 0.6s ease-out forwards;
+    animation-delay: 0.1s;
+  }
+  .ring-wrap{
+    width:420px; height:420px;
+    display:grid; place-items:center; position:relative;
+  }
+
+  /* SVG ring */
+  svg.progress{width:100%; height:100%; position:absolute; left:0; top:0; pointer-events:none}
+  .ring-bg{fill:none; stroke:rgba(255,255,255,.04); stroke-width:14}
+  /* UPDATED: Added subtle breathing animation to the ring shadow */
+  .ring-bar{fill:none; stroke: url(#grad); stroke-width:14; stroke-linecap:round;
+            filter: drop-shadow(0 6px 18px rgba(56,189,248,.25)); 
+            transition: stroke-dashoffset .8s linear, filter .4s ease;
+            animation: ring-breath 4s infinite alternate ease-in-out;
+  }
+  .ring-tick{stroke:rgba(255,255,255,.06); stroke-width:2}
+
+  /* Circular inner area (holds the stage image) */
+  .inner{
+    width:62%; height:62%; border-radius:50%;
+    display:grid; place-items:center; position:relative;
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.02), transparent 20%), linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+    border: 10px solid rgba(255,255,255,.02);
+    box-shadow: 0 18px 40px rgba(2,8,23,.6), inset 0 8px 24px rgba(0,0,0,.45);
+    transition: transform .35s ease, box-shadow .35s ease;
+  }
+  .inner img{
+    width:62%; height:62%; object-fit:contain; border-radius:100px;
+    transition: transform .35s ease, opacity .35s ease;
+    /* UPDATED: Refined glow animation */
+    animation: neon-glow 4s infinite alternate ease-in-out;
+  }
+  /* UPDATED: Enhanced hover glow */
+  .inner:hover{
+    transform: scale(1.05);
+    box-shadow: 0 20px 45px rgba(2,8,23,.7),
+              inset 0 8px 24px rgba(0,0,0,.5),
+              0 0 35px rgba(var(--accent1-rgb), 0.4);
+  }
+  .inner:hover img{transform: scale(1.08)}
+
+  /* Stage label & percent (below the circle) */
+  .stage-footer{
+    position:absolute; bottom:-28px; left:50%; transform:translateX(-50%);
+    display:flex; gap:12px; align-items:center; background:var(--panel);
+    padding:10px 16px; border-radius:999px; box-shadow:var(--shadow);
+    border:1px solid rgba(255,255,255,.04); color:var(--muted); font-size:13px;
+  }
+  .stage-footer .label{font-weight:600; color:var(--text)}
+  .pct-bubble{background:rgba(255,255,255,.03); padding:6px 10px; border-radius:999px; font-weight:700}
+
+  /* Final stage glow + sparkles */
+  .ring-wrap.final .ring-bar{ 
+    filter: drop-shadow(0 0 18px var(--accent2)) drop-shadow(0 0 32px var(--accent1));
+    animation: neon-glow 3s infinite alternate;
+  }
+  .sparkles{position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .6s}
+  .ring-wrap.final .sparkles{opacity:1}
+  .sparkles i{position:absolute;width:8px;height:8px;border-radius:50%; background:radial-gradient(circle,#fff,#bde3ff 40%,transparent 70%); animation: tw 1.6s infinite alternate}
+  @keyframes tw{from{transform:scale(.65);opacity:.7}to{transform:scale(1.35);opacity:1}}
+
+  /* Quote area */
+  .quote{
+    max-width:900px; text-align:center; padding:18px 22px; border-radius:14px;
+    background:var(--panel); border:1px solid rgba(255,255,255,.06); box-shadow:var(--shadow);
+    backdrop-filter: blur(10px);
+    font-size:clamp(16px, 2.2vw, 22px); font-weight:700; color:var(--text);
+    /* UPDATED: Smoother transition */
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  /* UPDATED: Enhanced hover glow */
+  .quote:hover {
+    transform: scale(1.02) translateY(-3px);
+    box-shadow: 0 12px 35px rgba(2,8,23,.8), 0 0 20px rgba(var(--accent1-rgb), 0.2);
+    border-color: rgba(var(--accent1-rgb), 0.3);
+  }
+  .quote small{display:block;margin-top:8px;color:var(--muted);font-weight:500}
+
+  /* Tasks small box */
+  .tasks{
+    width:260px; max-height:40vh; display:flex; flex-direction:column; background:rgba(0,0,0,.6);
+    border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.03); box-shadow:var(--shadow);
+    backdrop-filter: blur(10px);
+  }
+  .tasks header{padding:10px 12px;color:var(--muted);font-size:12px;border-bottom:1px solid rgba(255,255,255,.02); text-transform:uppercase; letter-spacing:.08em}
+  .tasks .list{padding:10px; overflow:auto; flex:1}
+  .tasks .list .item {
+    transition: background-color 0.2s ease;
+    border-radius: 6px;
+    /* NEW: Animation for when tasks are added/rendered */
+    animation: task-in 0.4s ease-out backwards;
+  }
+  .tasks .list .item:hover {
+    background-color: rgba(255,255,255,0.04);
+  }
+  .tasks .controls{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,.02)}
+  .tasks input{flex:1;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.03);background:transparent;color:var(--text)}
+  .btn{background:linear-gradient(180deg,#0f1724,#071226); color:var(--text); border-radius:10px; padding:8px 12px; border:1px solid rgba(255,255,255,.04); cursor:pointer;
+       transition: all 0.2s ease-in-out;
+  }
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 15px var(--accent1);
+    background: linear-gradient(180deg,#1a2538,#0f1c36);
+    /* NEW: Border glow on hover */
+    border-color: rgba(var(--accent1-rgb), 0.4);
+  }
+  .btn:active {
+    transform: translateY(0);
+    transition-duration: 0.1s;
+  }
+
+  /* Presence banner */
+  .presence{position:fixed; left:50%; top:14px; transform:translateX(-50%); padding:10px 14px; border-radius:999px; display:none; z-index:60; color:#fff; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.36)}
+
+  /* UPDATED: Toasts moved to top-right to avoid clutter */
+  .toasts{
+    position:fixed; 
+    top: 110px; /* Position below the timer */
+    right: 16px; /* Align with timer padding */
+    display:flex; 
+    flex-direction:column; 
+    gap:10px; 
+    z-index:70;
+    width: 240px;
+  }
+  .toast{
+    background:rgba(0,0,0,.6); padding:10px 12px; border-radius:10px; box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.03);
+    /* Toast animation */
+    animation: toast-in 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+  }
+
+  /* === Animations === */
+  @keyframes bg-pan {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes load-in {
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes fadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+  /* UPDATED: Refined glow animation */
+  @keyframes neon-glow {
+    from { filter: drop-shadow(0 0 6px var(--accent1)) drop-shadow(0 0 12px var(--accent1)); }
+    to   { filter: drop-shadow(0 0 12px var(--accent2)) drop-shadow(0 0 24px var(--accent2)); }
+  }
+  /* NEW: Pulsing glow for status indicators */
+  @keyframes pulse-glow {
+    from { box-shadow: 0 0 8px rgba(var(--glow-color), 0.1); }
+    to   { box-shadow: 0 0 16px rgba(var(--glow-color), 0.3); }
+  }
+  /* NEW: Subtle breathing for main ring */
+  @keyframes ring-breath {
+      from { filter: drop-shadow(0 6px 16px rgba(var(--accent1-rgb),.20)); }
+      to   { filter: drop-shadow(0 6px 24px rgba(var(--accent1-rgb),.35)); }
+  }
+  /* NEW: Animation for task items */
+  @keyframes task-in {
+      from { opacity: 0; transform: translateX(-15px); }
+      to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Classes for JS to trigger animations */
+  .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+  .fade-out { animation: fadeOut 0.5s ease-out forwards; }
+  
+  /* Hide elements until session starts */
+  body:not(.session-started) .corner,
+  body:not(.session-started) .center,
+  body:not(.session-started) .bottom-center {
+    opacity: 0;
+  }
+
+  /* Setup Modal Animation */
+  .modal {
+    animation: fadeIn 0.4s ease-out;
+  }
+  .modal > div {
+    animation: load-in 0.4s ease-out 0.1s backwards;
+  }
+
+  /* NEW: Confetti Container */
+  #confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* Small screens */
+  @media (max-width:860px){
+    .ring-wrap{width:340px;height:340px}
+    .cam{width:200px}
+    .tasks{width:80vw}
+    /* UPDATED: Move toasts for small screens */
+    .toasts { top: auto; bottom: 16px; right: 16px; width: min(240px, 70vw); }
+  }
+</style>
+</head>
+<body>
+  <!-- presence banner -->
+  <div id="presenceBanner" class="presence">No movement detected — returning soon. Timer will reverse if you're away.</div>
+
+  <!-- webcam top-left -->
+  <div class="corner top-left">
+    <div class="cam">
+      <header><span id="camDot" class="dot"></span> Webcam</header>
+      <video id="cam" autoplay playsinline muted></video>
+      <div id="camStatus" class="status">Waiting to start…</div>
+    </div>
+  </div>
+
+  <!-- timer top-right -->
+  <div class="corner top-right">
+    <div class="timer">
+      <div id="time" class="time">00:00</div>
+      <div class="mini-bar" aria-hidden="true"><span id="bar" style="width:0%"></span></div>
+      <div id="aiStatus" class="ai-status">Idle</div>
+    </div>
+  </div>
+
+  <!-- center: circular progress with inner image -->
+  <div class="center">
+    <div id="ringWrap" class="ring-wrap" role="img" aria-label="Study progress ring">
+      <svg class="progress" viewBox="-50 -50 100 100" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="grad" x1="0" x2="1">
+            <stop offset="0" stop-color="#38bdf8"/>
+            <stop offset="50%" stop-color="#818cf8"/>
+            <stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="0" cy="0" r="44" />
+        <g transform="rotate(-90)">
+          <circle id="ringBar" class="ring-bar" cx="0" cy="0" r="44" stroke-dasharray="276.46" stroke-dashoffset="276.46"/>
+        </g>
+        <g>
+          <line class="ring-tick" x1="0" y1="-52" x2="0" y2="-48"></line>
+          <line class="ring-tick" x1="52" y1="0" x2="48" y2="0"></line>
+          <line class="ring-tick" x1="0" y1="52" x2="0" y2="48"></line>
+          <line class="ring-tick" x1="-52" y1="0" x2="-48" y2="0"></line>
+        </g>
+      </svg>
+
+      <div class="sparkles" aria-hidden="true">
+        <i style="top:8%; left:46%; animation-delay:.0s"></i>
+        <i style="top:18%; left:72%; animation-delay:.3s"></i>
+        <i style="top:45%; left:86%; animation-delay:.6s"></i>
+        <i style="top:80%; left:70%; animation-delay:.2s"></i>
+        <i style="top:82%; left:26%; animation-delay:.8s"></i>
+        <i style="top:50%; left:10%; animation-delay:.5s"></i>
+      </div>
+
+      <figure class="inner" id="inner">
+        <img id="stageImg" alt="Stage image" src="" />
+      </figure>
+
+      <div class="stage-footer" id="stageFooter">
+        <div class="label" id="stageName">Stage 1: Egg</div>
+        <div class="pct-bubble" id="stagePct">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- tasks bottom-left -->
+  <div class="corner bottom-left">
+    <section class="tasks" id="tasks">
+      <header>TASKS</header>
+      <div id="taskList" class="list"></div>
+      <div class="controls">
+        <input id="taskInput" placeholder="Add a task…" />
+        <button id="addTask" class="btn">Add</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- quote bottom-center -->
+  <div class="bottom-center">
+    <figure class="quote" id="quoteBox">
+      <div id="quoteText">“Focus is the art of knowing what to ignore.”</div>
+      <small id="quoteMeta">— James Clear • new quote every 5 minutes</small>
+    </figure>
+  </div>
+
+  <!-- in-app toast notifications -->
+  <div class="toasts" id="toasts"></div>
+
+  <!-- hidden canvases for motion detection -->
+  <canvas id="motionCanvas" width="280" height="190" style="display:none"></canvas>
+  <canvas id="prevCanvas" width="280" height="190" style="display:none"></canvas>
+  
+  <!-- NEW: Confetti container -->
+  <div id="confetti-container" aria-hidden="true"></div>
+
+  <!-- Setup modal (starts visible) -->
+  <div id="setup" class="modal" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;z-index:60;background:rgba(3,6,14,.6);">
+    <div style="width:min(680px,92vw);background:linear-gradient(180deg,#071428,#081228);border-radius:14px;padding:20px;border:1px solid rgba(255,255,255,.04);box-shadow:0 20px 50px rgba(0,0,0,.6)">
+      <h2 style="margin:0 0 8px">Set up your study session</h2>
+      <p style="color:var(--muted);margin:0 0 12px">Enter total minutes and choose absence limit (when no movement triggers a warning).</p>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;background:rgba(255,255,255,.02);padding:12px;border-radius:10px">
+          <label style="font-size:13px;color:var(--muted)">Total time (minutes)</label>
+          <input id="minutes" type="number" min="1" placeholder="e.g. 60" style="width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.03);background:transparent;color:var(--text)" />
+        </div>
+        <div style="width:180px;background:rgba(255,255,255,.02);padding:12px;border-radius:10px">
+          <label style="font-size:13px;color:var(--muted)">Absence limit</label>
+          <select id="absenceLimit" style="width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.03);background:#071229; color:var(--text)">
+            <option value="7000" selected>7 seconds</option>
+            <option value="15000">15 seconds</option>
+            <option value="20000">20 seconds</option>
+            <option value="30000">30 seconds</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button id="testNotify" class="btn">Test Notification</button>
+        <button id="start" class="btn">Start Session</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ======================================================
+   Single-file JavaScript
+   - All logic for timer, stages, webcam motion detection,
+     localStorage tasks, quotes, and notifications.
+   - Comments included for clarity.
+   ====================================================== */
+
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const toasts = $('#toasts');
+function toast(msg, ms=3000){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  toasts.appendChild(el);
+  setTimeout(()=> el.remove(), ms);
+}
+
+// Notification helper (system or fallback)
+async function ensureNotification(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission === 'granted') return true;
+  if(Notification.permission !== 'denied'){
+    const p = await Notification.requestPermission();
+    return p === 'granted';
+  }
+  return false;
+}
+function notify(title, body){
+  if('Notification' in window && Notification.permission === 'granted'){
+    try { new Notification(title, { body }); }
+    catch { toast(title + ' — ' + body); }
+  } else {
+    toast(title + ' — ' + body);
+  }
+}
+
+/* =========================
+   Stage images & quotes (data URIs)
+   Using lightweight inline SVGs so file is offline-capable
+   ========================= */
+function svgData(bg1, bg2, emoji, label){
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
+      <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/></linearGradient></defs>
+      <rect fill="url(#g)" width="100%" height="100%"/>
+      <text x="50%" y="48%" font-size="340" text-anchor="middle" dominant-baseline="middle">${emoji}</text>
+      <text x="50%" y="78%" font-size="72" text-anchor="middle" fill="#e6eef8" font-family="Segoe UI, Arial">${label}</text>
+    </svg>`
+  );
+}
+
+const STAGES = [
+  {name:'Stage 1: Egg', img: svgData('#06b6d4','#0f172a','🥚','Egg')},
+  {name:'Stage 2: Caterpillar', img: svgData('#34d399','#07251a','🐛','Caterpillar')},
+  {name:'Stage 3: Chrysalis', img: svgData('#a78bfa','#24113b','🪲','Chrysalis')},
+  {name:'Stage 4: Butterfly', img: svgData('#f472b6','#3b1052','🦋','Butterfly')},
+];
+
+const QUOTES = [
+  ['Focus is the art of knowing what to ignore.','James Clear'],
+  ['Small progress is still progress.','Unknown'],
+  ['The future depends on what you do today.','Mahatma Gandhi'],
+  ['Discipline is choosing what you want most over what you want now.','A. Lincoln'],
+  ['The secret of getting ahead is getting started.','Mark Twain'],
+  ['Action cures fear, inaction creates terror.','Douglas Horton'],
+  ['Simplicity is the ultimate sophistication.','Leonardo da Vinci'],
+  ['Motivation gets you started. Habit keeps you going.','Jim Ryun'],
+  ['Well begun is half done.','Aristotle'],
+  ['Do the hard work, especially when you don’t feel like it.','Unknown']
+];
+const STAGE_QUOTES = [
+  ['Every giant oak starts as a tiny acorn. Begin.','— Stage: Egg'],
+  ['Keep moving—millimeters add up to miles.','— Stage: Caterpillar'],
+  ['Trust the quiet work of growth.','— Stage: Chrysalis'],
+  ['Spread your wings—you’ve earned it.','— Stage: Butterfly']
+];
+
+// DOM refs used later
+const cam = $('#cam'), camStatus = $('#camStatus'), camDot = $('#camDot');
+const motionCanvas = $('#motionCanvas'), prevCanvas = $('#prevCanvas');
+const mctx = motionCanvas.getContext('2d'), pctx = prevCanvas.getContext('2d');
+
+const timeEl = $('#time'), barFill = $('#bar');
+const ringBar = $('#ringBar'), ringWrap = $('#ringWrap');
+const stageImg = $('#stageImg'), stageName = $('#stageName'), stagePct = $('#stagePct');
+const presenceBanner = $('#presenceBanner');
+const aiStatusEl = $('#aiStatus');
+
+
+
+/* =========================
+   Timer + Stage logic
+   ========================= */
+let totalSeconds = 0;
+let elapsed = 0;
+let tickId = null;
+let reversing = false;
+let nextTen = 600;
+const circumference = 2 * Math.PI * 44;
+
+function fmtTime(s){ s = Math.max(0, Math.floor(s)); const mm = Math.floor(s/60); const ss = s%60; return `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`; }
+function pct(){ return totalSeconds ? (elapsed/totalSeconds) : 0; }
+function stageIndexFromPct(p){
+  if (p >= 0.75) return 3;
+  if (p >= 0.50) return 2;
+  if (p >= 0.25) return 1;
+  return 0;
+}
+let lastStage = -1;
+
+function updateUI(){
+  const p = pct();
+  const idx = stageIndexFromPct(p);
+  if (idx !== lastStage){
+    if (lastStage !== -1 && idx > lastStage){
+      notify(`Stage ${idx}: ${STAGES[idx-1].name} completed!, ${(idx*25)}% reached.`);
+      toast(`Stage ${idx}: ${STAGES[idx-1].name} completed!`);
+    }
+    stageImg.classList.add('fade-out');
+    setTimeout(()=> {
+      stageImg.src = STAGES[idx].img;
+      stageName.textContent = STAGES[idx].name;
+      stagePct.textContent = Math.round(p*100) + '%';
+      stageImg.classList.remove('fade-out');
+      stageImg.classList.add('fade-in');
+      setTimeout(()=> stageImg.classList.remove('fade-in'), 600);
+    }, 160);
+
+    if (idx === 3) ringWrap.classList.add('final'); else ringWrap.classList.remove('final');
+    setQuoteForStage(idx);
+    lastStage = idx;
+  } else {
+    stagePct.textContent = Math.round(p*100) + '%';
+  }
+
+  timeEl.textContent = fmtTime(elapsed);
+  barFill.style.width = Math.min(100, Math.round(p*100)) + '%';
+  const offset = circumference * (1 - Math.min(1, Math.max(0, p)));
+  ringBar.setAttribute('stroke-dashoffset', String(offset));
+
+  if (elapsed >= totalSeconds && tickId){
+    elapsed = totalSeconds;
+    clearInterval(tickId); tickId = null;
+    notify('Session complete!', 'You reached 100% — great work!');
+    toast('Session complete! 🎉');
+    launchConfetti(); // Fire confetti on completion
+  }
+}
+
+function startTick(){
+  if (tickId) clearInterval(tickId);
+  tickId = setInterval(()=>{
+    if (!reversing){
+      elapsed = Math.min(totalSeconds, elapsed + 1);
+      if (elapsed >= nextTen){
+        notify('10 minutes completed!', 'Keep going — great milestone!');
+        toast('10 minutes completed successfully!');
+        nextTen += 600;
+      }
+    } else {
+      elapsed = Math.max(0, elapsed - 1);
+    }
+    updateUI();
+  }, 1000);
+}
+
+/* =========================
+   Quotes logic
+   ========================= */
+function setQuoteForStage(idx){
+  const [q, meta] = STAGE_QUOTES[idx] || QUOTES[idx % QUOTES.length];
+  $('#quoteText').textContent = '“' + q + '”';
+  $('#quoteMeta').textContent = meta + ' • new quote every 5 minutes';
+}
+function startQuoteRotation(){
+  setInterval(()=> {
+    const pick = QUOTES[Math.floor(Math.random()*QUOTES.length)];
+    $('#quoteText').textContent = '“' + pick[0] + '”';
+    $('#quoteMeta').textContent = '— ' + pick[1] + ' • new quote every 5 minutes';
+  }, 5*60*1000);
+}
+
+/* =========================
+   NEW: Confetti on completion
+   ========================= */
+function launchConfetti() {
+    const container = $('#confetti-container');
+    if (!container) return;
+
+    const confettiCount = 150;
+    const colors = [
+        getComputedStyle(document.documentElement).getPropertyValue('--accent1').trim(),
+        getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim(),
+        getComputedStyle(document.documentElement).getPropertyValue('--accent3').trim(),
+        '#e6eef8' // --text color
+    ];
+
+    for (let i = 0; i < confettiCount; i++) {
+        const confettiEl = document.createElement('div');
+        
+        const size = Math.floor(Math.random() * 10) + 8; // 8px to 18px
+        const x = Math.random() * window.innerWidth;
+        const y = -20;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        confettiEl.style.width = `${size}px`;
+        confettiEl.style.height = `${size / 2}px`; // rectangular confetti
+        confettiEl.style.backgroundColor = color;
+        confettiEl.style.position = 'absolute';
+        confettiEl.style.left = `${x}px`;
+        confettiEl.style.top = `${y}px`;
+        
+        container.appendChild(confettiEl);
+
+        const fallDuration = Math.random() * 3000 + 2000; // 2-5 seconds
+        const horizontalDrift = (Math.random() - 0.5) * 300;
+        const rotation = Math.random() * 720 - 360; // Random rotation
+
+        confettiEl.animate([
+            { transform: `translate(0, 0) rotate(0)`, opacity: 1 },
+            { transform: `translate(${horizontalDrift}px, ${window.innerHeight + 50}px) rotate(${rotation}deg)`, opacity: 0 }
+        ], {
+            duration: fallDuration,
+            easing: 'ease-out',
+            iterations: 1
+        }).onfinish = () => {
+            confettiEl.remove();
+        };
+    }
+}
+
+/* =========================
+   Webcam & presence detection
+   ========================= */
+let lastMotionAt = Date.now();
+let warned = false;
+let warnedAt = null;
+let reversingSince = null;
+let checkInterval = 200;
+let DIFF_THR = 30;
+let CHANGE_RATIO = 0.02;
+let absenceLimitMs = 20000;
+let faceDetector = null;
+let faceDetectionSupported = false;
+if ('FaceDetector' in window){
+  try {
+    faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+    faceDetectionSupported = true;
+  } catch (e) {
+    faceDetectionSupported = false;
+  }
+}
+
+function setStatusFocusing(){
+  aiStatusEl.textContent = 'Focusing';
+  aiStatusEl.classList.remove('away');
+  aiStatusEl.classList.add('focusing');
+  camDot.style.background = 'var(--good)';
+  camDot.style.boxShadow = '0 0 8px rgba(52,211,153,.9)';
+}
+function setStatusAway(){
+  aiStatusEl.textContent = 'Away';
+  aiStatusEl.classList.remove('focusing');
+  aiStatusEl.classList.add('away');
+  camDot.style.background = 'var(--bad)';
+  camDot.style.boxShadow = '0 0 8px rgba(239,68,68,.9)';
+}
+
+async function detectFaceWithAPI(){
+  try {
+    mctx.drawImage(cam, 0, 0, motionCanvas.width, motionCanvas.height);
+    const faces = await faceDetector.detect(motionCanvas);
+    return faces && faces.length > 0;
+  } catch (err) {
+    return null;
+  }
+}
+
+function changedRatio(cur, prv){
+  const a = cur.data, b = prv.data;
+  let changed = 0;
+  for (let i=0;i<a.length;i+=4){
+    const dr = Math.abs(a[i] - b[i]);
+    const dg = Math.abs(a[i+1] - b[i+1]);
+    const db = Math.abs(a[i+2] - b[i+2]);
+    if (dr > DIFF_THR || dg > DIFF_THR || db > DIFF_THR) changed++;
+  }
+  return changed / (a.length / 4);
+}
+
+function presenceLoop(){
+  pctx.drawImage(cam, 0, 0, prevCanvas.width, prevCanvas.height);
+  setInterval(async ()=>{
+    try {
+      let faceDetected = null;
+      if (faceDetectionSupported && faceDetector){
+        const res = await detectFaceWithAPI();
+        if (res !== null) faceDetected = res;
+      }
+      if (faceDetected === null){
+        mctx.drawImage(cam, 0, 0, motionCanvas.width, motionCanvas.height);
+        const cur = mctx.getImageData(0,0,motionCanvas.width,motionCanvas.height);
+        const prv = pctx.getImageData(0,0,prevCanvas.width,prevCanvas.height);
+        const ratio = changedRatio(cur, prv);
+        pctx.putImageData(cur, 0, 0);
+        faceDetected = (ratio >= CHANGE_RATIO);
+      } else {
+        mctx.drawImage(cam, 0, 0, motionCanvas.width, motionCanvas.height);
+        const cur2 = mctx.getImageData(0,0,motionCanvas.width,motionCanvas.height);
+        pctx.putImageData(cur2, 0, 0);
+      }
+      const now = Date.now();
+      if (faceDetected){
+        setStatusFocusing();
+        lastMotionAt = now;
+      } else {
+        setStatusAway();
+      }
+      if (faceDetected){
+        if (warned){
+          warned = false; warnedAt = null;
+          presenceBanner.style.display = 'none';
+        }
+        if (reversing){
+          reversing = false;
+          reversingSince = null;
+          toast('Welcome back — resuming forward progress.');
+        }
+      } else {
+        const since = now - lastMotionAt;
+        if (!warned && since > absenceLimitMs){
+          warned = true; warnedAt = now;
+          presenceBanner.style.display = 'block';
+          notify('Please come back to the study area!', 'No movement detected.');
+          toast('Please come back to the study area!');
+        }
+        if (warned && !reversing && (Date.now() - warnedAt) > 5000){
+          reversing = true;
+          reversingSince = Date.now();
+          toast('No presence — timer reversing until you return.');
+        }
+      }
+    } catch(e){
+      console.warn('presenceLoop error', e);
+    }
+  }, checkInterval);
+}
+/* =========================
+   Tasks via localStorage
+   ========================= */
+const TASKS_KEY = 'stage_timer_tasks_v1';
+function loadTasks(){
+  try { return JSON.parse(localStorage.getItem(TASKS_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveTasks(list){ try { localStorage.setItem(TASKS_KEY, JSON.stringify(list)); } catch{} }
+function renderTasks(){
+  const box = $('#taskList'); box.innerHTML = '';
+  const list = loadTasks();
+  if (!list.length){
+    const p = document.createElement('div'); p.style.color = 'var(--muted)'; p.style.padding = '8px'; p.textContent = 'No tasks yet — add one below.'; box.appendChild(p);
+    return;
+  }
+  list.forEach((t,i)=>{
+    const row = document.createElement('label'); row.className = 'item';
+    // NEW: Staggered animation for task items
+    row.style.animationDelay = `${i * 50}ms`;
+    row.style.display='flex'; row.style.alignItems='center'; row.style.gap='10px'; row.style.padding='6px 0';
+    const cb = document.createElement('input'); cb.type='checkbox'; cb.checked = !!t.done;
+    cb.addEventListener('change', ()=>{ const all = loadTasks(); all[i].done = cb.checked; saveTasks(all); renderTasks(); });
+    const span = document.createElement('span'); span.textContent = t.text; span.style.flex='1';
+    if (t.done) { span.style.textDecoration = 'line-through'; span.style.opacity = '.6'; }
+    const del = document.createElement('button'); del.className='btn'; del.textContent='✕'; del.style.marginLeft='8px';
+    del.addEventListener('click', ()=>{ const all = loadTasks(); all.splice(i,1); saveTasks(all); renderTasks(); });
+    row.appendChild(cb); row.appendChild(span); row.appendChild(del); box.appendChild(row);
+  });
+}
+$('#addTask').addEventListener('click', ()=>{ const v = $('#taskInput').value.trim(); if (!v) return; const all = loadTasks(); all.push({text:v, done:false}); saveTasks(all); $('#taskInput').value = ''; renderTasks(); });
+$('#taskInput').addEventListener('keyup', e=>{ if (e.key === 'Enter') $('#addTask').click(); });
+renderTasks();
+
+/* =========================
+   Setup form
+   ========================= */
+$('#testNotify').addEventListener('click', async ()=>{ const ok = await ensureNotification(); if (ok) notify('Notifications enabled','You will get stage & milestone alerts.'); else toast('Notifications not enabled (denied or unsupported).'); });
+
+$('#start').addEventListener('click', async ()=>{ 
+  const mins = parseInt($('#minutes').value, 10);
+  if (!mins || mins <= 0){ toast('Please enter a valid duration in minutes'); $('#minutes').focus(); return; }
+  absenceLimitMs = parseInt($('#absenceLimit').value, 10) || 20000;
+  totalSeconds = Math.max(1, Math.floor(mins * 60));
+  elapsed = 0; lastStage = -1; reversing = false; nextTen = 600;
+  
+  stageImg.src = STAGES[0].img;
+  stageName.textContent = STAGES[0].name;
+  stagePct.textContent = '0%';
+  
+  // Add class to body to trigger load-in animations
+  document.body.classList.add('session-started');
+
+  await startCamera();
+  presenceLoop();
+  startQuoteRotation();
+  startTick();
+  
+  $('#setup').style.display = 'none';
+  toast('Session started — good luck!');
+});
+
+/* =========================
+   Camera startup
+   ========================= */
+async function startCamera(){
+  camStatus.textContent = 'Requesting camera…';
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    cam.srcObject = s;
+    await cam.play().catch(()=>{});
+    camStatus.textContent = 'Camera active.';
+    camDot.style.background = 'var(--good)';
+    camDot.style.boxShadow = '0 0 8px rgba(52,211,153,.9)';
+  } catch(e){
+    camStatus.textContent = 'Camera failed or blocked.';
+    camDot.style.background = 'var(--bad)';
+    camDot.style.boxShadow = '0 0 8px rgba(239,68,68,.9)';
+    toast('Camera error (permission or insecure context). Motion detection will be disabled.');
+  }
+}
+
+/* =========================
+   Initial UI initialization
+   ========================= */
+timeEl.textContent = '00:00';
+barFill.style.width = '0%';
+stageImg.src = STAGES[0].img;
+setQuoteForStage(0);
+
+</script>
+</body>
+</html>
